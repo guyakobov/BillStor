@@ -1,0 +1,8 @@
+{
+  "name": "ReceiptOrganizer",
+  "description": "A smart receipt organizer that scans SMS for invoices, extracts details using AI, and organizes them into folders.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
