@@ -1,14 +1,17 @@
 import React from 'react';
 import { Receipt } from '../types';
 import { CATEGORY_COLORS, CATEGORY_ICONS, getCategoryStyles } from '../constants';
-import { ExternalLink, Calendar, Loader2, Tag, Clock } from 'lucide-react';
+import { ExternalLink, Calendar, Loader2, Tag, Clock, Check } from 'lucide-react';
 
 interface Props {
   receipt: Receipt;
   onClick: (r: Receipt) => void;
+  isSelectionMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelection?: (id: string) => void;
 }
 
-export const ReceiptCard: React.FC<Props> = ({ receipt, onClick }) => {
+export const ReceiptCard: React.FC<Props> = ({ receipt, onClick, isSelectionMode = false, isSelected = false, onToggleSelection }) => {
   const isCredit = receipt.type === 'credit';
   
   // Dynamic styling based on type and custom categories
@@ -16,7 +19,7 @@ export const ReceiptCard: React.FC<Props> = ({ receipt, onClick }) => {
   
   const Icon = isCredit ? Tag : CategoryIcon;
   const colorClass = isCredit ? 'bg-amber-100 text-amber-600' : categoryColorClass;
-  const borderClass = isCredit ? 'border-amber-200' : 'border-gray-100';
+  const borderClass = isSelected ? 'border-blue-500 ring-1 ring-blue-500 bg-blue-50/50' : (isCredit ? 'border-amber-200' : 'border-gray-100');
   
   const formatDate = (isoString?: string) => {
     if (!isoString) return '';
@@ -28,6 +31,14 @@ export const ReceiptCard: React.FC<Props> = ({ receipt, onClick }) => {
       });
     } catch (e) {
       return isoString;
+    }
+  };
+
+  const handleClick = () => {
+    if (isSelectionMode && onToggleSelection) {
+      onToggleSelection(receipt.id);
+    } else {
+      onClick(receipt);
     }
   };
 
@@ -47,11 +58,18 @@ export const ReceiptCard: React.FC<Props> = ({ receipt, onClick }) => {
 
   return (
     <div 
-      onClick={() => onClick(receipt)}
-      className={`bg-white p-4 rounded-xl shadow-sm border ${borderClass} flex items-center gap-4 active:scale-[0.98] transition-transform cursor-pointer relative overflow-hidden`}
+      onClick={handleClick}
+      className={`bg-white p-4 rounded-xl shadow-sm border ${borderClass} flex items-center gap-4 active:scale-[0.98] transition-all cursor-pointer relative overflow-hidden`}
     >
       {/* Visual Indicator strip for Credits */}
-      {isCredit && <div className="absolute top-0 right-0 w-1.5 h-full bg-amber-400"></div>}
+      {isCredit && !isSelected && <div className="absolute top-0 right-0 w-1.5 h-full bg-amber-400"></div>}
+
+      {/* Selection Checkbox */}
+      {isSelectionMode && (
+        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300 bg-white'}`}>
+           {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
+        </div>
+      )}
 
       <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${colorClass}`}>
         <Icon className="w-6 h-6" />

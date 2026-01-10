@@ -1,23 +1,25 @@
 import React from 'react';
 import { Category, Receipt } from '../types';
 import { getCategoryStyles, DEFAULT_CATEGORIES } from '../constants';
-import { Plus } from 'lucide-react';
+import { Plus, Pencil, Mail } from 'lucide-react';
 
 interface Props {
   receipts: Receipt[];
   categories: string[];
   onSelectCategory: (category: string) => void;
   onAddFolder: () => void;
+  onRenameFolder: (category: string) => void;
+  onEmailFolder: (category: string) => void;
 }
 
-export const FolderGrid: React.FC<Props> = ({ receipts, categories, onSelectCategory, onAddFolder }) => {
+export const FolderGrid: React.FC<Props> = ({ receipts, categories, onSelectCategory, onAddFolder, onRenameFolder, onEmailFolder }) => {
   const getCount = (cat: string) => receipts.filter(r => r.category === cat).length;
   const getTotal = (cat: string) => receipts
     .filter(r => r.category === cat)
     .reduce((sum, r) => sum + r.amount, 0);
 
   return (
-    <div className="grid grid-cols-2 gap-4 p-4">
+    <div className="grid grid-cols-2 gap-4">
       {categories.map((cat) => {
         const { icon: Icon, colorClass } = getCategoryStyles(cat);
         const count = getCount(cat);
@@ -31,19 +33,35 @@ export const FolderGrid: React.FC<Props> = ({ receipts, categories, onSelectCate
           <div 
             key={cat}
             onClick={() => onSelectCategory(cat)}
-            className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3 active:bg-gray-50 transition-colors cursor-pointer h-32 justify-between"
+            className="group relative bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3 active:bg-gray-50 transition-colors cursor-pointer h-32 justify-between"
           >
             <div className="flex justify-between items-start">
                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${colorClass}`}>
                  <Icon className="w-5 h-5" />
                </div>
-               <span className="text-xs font-medium text-gray-400">{count} פריטים</span>
+               
+               <div className="flex gap-1">
+                 <button 
+                    onClick={(e) => { e.stopPropagation(); onEmailFolder(cat); }}
+                    className="p-1.5 text-gray-300 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors z-10"
+                    title="שלח דוח למייל"
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                 </button>
+                 <button 
+                    onClick={(e) => { e.stopPropagation(); onRenameFolder(cat); }}
+                    className="p-1.5 text-gray-300 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors z-10"
+                    title="שנה שם"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                 </button>
+               </div>
             </div>
             
             <div>
-              <h3 className="font-bold text-gray-800 text-sm truncate">{cat}</h3>
+              <h3 className="font-bold text-gray-800 text-sm truncate pr-1">{cat}</h3>
               <p className="text-xs text-gray-500 mt-1 font-mono">
-                ₪{total.toFixed(0)}
+                {count} פריטים • ₪{total.toFixed(0)}
               </p>
             </div>
           </div>
