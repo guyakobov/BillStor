@@ -44,6 +44,11 @@ app.get('/api/receipts', (req, res) => {
     res.json({ message: 'Receipts endpoint coming soon' });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
-});
+// Only listen if not running on Vercel/Production
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
+    });
+}
+
+export default app;
