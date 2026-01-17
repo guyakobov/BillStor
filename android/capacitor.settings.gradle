@@ -7,3 +7,6 @@ project(':capacitor-camera').projectDir = new File('../node_modules/@capacitor/c
 
 include ':capacitor-preferences'
 project(':capacitor-preferences').projectDir = new File('../node_modules/@capacitor/preferences/android')
+
+include ':solimanware-capacitor-sms-reader'
+project(':solimanware-capacitor-sms-reader').projectDir = new File('../node_modules/@solimanware/capacitor-sms-reader/android')

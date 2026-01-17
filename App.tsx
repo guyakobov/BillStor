@@ -3,6 +3,7 @@ import { Search, Folder, MessageSquare, Plus, ArrowRight, Settings, Camera, Shie
 import { Receipt, Category, SMSMessage } from './types';
 import { KEYWORDS, MOCK_SMS_MESSAGES, getCategoryStyles, DEFAULT_CATEGORIES } from './constants';
 import { analyzeReceiptFromText, analyzeReceiptFromImage } from './services/geminiService';
+import { requestSmsPermissions, readReceiptSms } from './services/smsService';
 import { FolderGrid } from './components/FolderGrid';
 import { ReceiptCard } from './components/ReceiptCard';
 
@@ -54,10 +55,19 @@ export default function App() {
     localStorage.setItem('categories_data', JSON.stringify(categories));
   }, [categories]);
 
-  const handlePermission = () => {
-    setPermissionGranted(true);
-    setShowPermissionModal(false);
-    simulateInboxScan();
+  const handlePermission = async () => {
+    // Request SMS permissions
+    const permissionResult = await requestSmsPermissions();
+
+    if (permissionResult.granted) {
+      setPermissionGranted(true);
+      setShowPermissionModal(false);
+      scanInboxForReceipts();
+    } else {
+      // Permission denied - show error or fallback
+      alert('SMS permissions are required to scan for receipts. Please enable them in settings.');
+      setShowPermissionModal(false);
+    }
   };
 
   const handleAddCategory = () => {
@@ -79,16 +89,22 @@ export default function App() {
     }
   };
 
-  const simulateInboxScan = async () => {
+  const scanInboxForReceipts = async () => {
     if (isScanning) return;
     setIsScanning(true);
     setActiveTab('scan');
     setScanningStatus('סורק הודעות SMS...');
 
-    const foundMessages = MOCK_SMS_MESSAGES.filter(msg =>
-      KEYWORDS.some(k => msg.body.includes(k))
-    );
+    // Read real SMS messages from device
+    const smsResult = await readReceiptSms();
 
+    if (smsResult.error) {
+      setScanningStatus(`שגיאה: ${smsResult.error}`);
+      setTimeout(() => setIsScanning(false), 3000);
+      return;
+    }
+
+    const foundMessages = smsResult.messages;
     const newMessages = foundMessages.filter(msg => !receipts.some(r => r.originalSmsBody === msg.body));
 
     if (newMessages.length === 0) {
@@ -337,8 +353,12 @@ export default function App() {
         <button onClick={() => { setActiveTab('folders'); setSelectedCategory(null); }} className={`flex flex-col items-center gap-1 ${activeTab === 'folders' ? 'text-blue-600' : 'text-gray-400'}`}>
           <Folder className="w-6 h-6" /><span className="text-[10px] font-medium">ראשי</span>
         </button>
-        <button onClick={simulateInboxScan} className={`flex flex-col items-center gap-1 ${activeTab === 'scan' ? 'text-blue-600' : 'text-gray-400'}`}>
-          <MessageSquare className="w-6 h-6" /><span className="text-[10px] font-medium">סריקת SMS</span>
+        <button
+          onClick={scanInboxForReceipts}
+          className={`flex flex-col items-center gap-1 ${activeTab === 'scan' ? 'text-blue-600' : 'text-gray-400'}`}
+        >
+          <MessageSquare className={`w-6 h-6 ${activeTab === 'scan' ? 'fill-current' : ''}`} />
+          <span className="text-[10px] font-medium">סריקת SMS</span>
         </button>
       </nav>
     </div>
