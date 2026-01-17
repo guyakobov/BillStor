@@ -6,9 +6,13 @@
     "start": "npm run start:server & npm run start:client",
     "start:client": "cd client && npm run dev",
     "start:server": "cd server && npm start",
-    "install:all": "npm install --legacy-peer-deps && cd client && npm install --legacy-peer-deps && cd ../server && npm install",
+    "install:all": "npm install --legacy-peer-deps",
     "build:android": "cd client && npm run build:apk"
   },
+  "workspaces": [
+    "client",
+    "server"
+  ],
   "devDependencies": {
     "concurrently": "^8.2.2"
   }
