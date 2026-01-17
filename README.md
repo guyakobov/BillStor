@@ -10,16 +10,15 @@ View your app in AI Studio: https://ai.studio/apps/drive/1VvX27g_A4sDGTqzVb9Y2WA
 
 ### 🚀 Commands (Run from Root)
 *   **Install Everything:** `npm run install:all`
-*   **Start App:** `npm start`
-*   **Build Android APK:** `powershell -ExecutionPolicy Bypass -File build_apk.ps1`
+*   **Start Client + Server:** `npm start`
+*   **Build Android APK:** `npm run build:android`
 
-## Run Locally
+## Project Structure
+*   `client/`: The React + Capacitor mobile app.
+*   `server/`: The Express API server (Extensible for DB).
 
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm run install:all`
-2. Set the `GEMINI_API_KEY` in environment variables or `.env`
-3. Run the app:
-   `npm start`
+## Deployment (Vercel)
+If deploying to Vercel:
+1. Set **Root Directory** to `client`.
+2. Set **Install Command** to `npm install --legacy-peer-deps`.
+3. Add `GEMINI_API_KEY` to Environment Variables.
