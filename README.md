@@ -8,13 +8,18 @@ This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/drive/1VvX27g_A4sDGTqzVb9Y2WAIjZ5nOg1Rx
 
+### 🚀 Commands (Run from Root)
+*   **Install Everything:** `npm run install:all`
+*   **Start App:** `npm start`
+*   **Build Android APK:** `powershell -ExecutionPolicy Bypass -File build_apk.ps1`
+
 ## Run Locally
 
 **Prerequisites:**  Node.js
 
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+   `npm run install:all`
+2. Set the `GEMINI_API_KEY` in environment variables or `.env`
 3. Run the app:
-   `npm run dev`
+   `npm start`
