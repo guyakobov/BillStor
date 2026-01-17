@@ -4,7 +4,7 @@ import { KEYWORDS, MOCK_SMS_MESSAGES, getCategoryStyles, DEFAULT_CATEGORIES } fr
 import { analyzeReceiptFromText, analyzeReceiptFromImage } from './services/geminiService';
 import { FolderGrid } from './components/FolderGrid';
 import { ReceiptCard } from './components/ReceiptCard';
-import { Search, Folder, MessageSquare, Plus, ArrowRight, Settings, Camera, ShieldCheck, X, Loader2, FileText, Tag, ChevronDown, Check, ArrowUpDown, Mail, Save, CheckSquare, TrendingUp, TrendingDown, Bell, AlertTriangle, Clock } from 'lucide-react';
+import { Search, Folder, MessageSquare, Plus, ArrowRight, Settings, Camera, ShieldCheck, X, Loader2, FileText, Tag, ChevronDown, Check, ArrowUpDown, Mail, Save, CheckSquare, TrendingUp, TrendingDown, Bell, AlertTriangle, Clock, Calendar, Trash2, CheckCircle2 } from 'lucide-react';
 
 const simpleId = () => Math.random().toString(36).substr(2, 9);
 
@@ -32,6 +32,7 @@ export default function App() {
   // Selection Mode State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedReceiptIds, setSelectedReceiptIds] = useState<Set<string>>(new Set());
+  const [selectedFolderCategories, setSelectedFolderCategories] = useState<Set<string>>(new Set());
 
   // New Folder Modal State
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
@@ -91,6 +92,7 @@ export default function App() {
   // Monthly Stats Calculation
   const currentMonthDate = new Date();
   const currentMonthName = currentMonthDate.toLocaleDateString('he-IL', { month: 'long' });
+  const currentYear = currentMonthDate.getFullYear();
   
   const monthlyStats = receipts.reduce((acc, r) => {
     const rDate = new Date(r.date);
@@ -98,6 +100,21 @@ export default function App() {
                           rDate.getFullYear() === currentMonthDate.getFullYear();
     
     if (isCurrentMonth) {
+      if (r.type === 'credit') {
+        acc.credits += r.amount;
+      } else {
+        acc.expenses += r.amount;
+      }
+    }
+    return acc;
+  }, { expenses: 0, credits: 0 });
+
+  // Yearly Stats Calculation
+  const yearlyStats = receipts.reduce((acc, r) => {
+    const rDate = new Date(r.date);
+    const isCurrentYear = rDate.getFullYear() === currentYear;
+    
+    if (isCurrentYear) {
       if (r.type === 'credit') {
         acc.credits += r.amount;
       } else {
@@ -285,13 +302,56 @@ ${itemsList}
   };
 
   const handleEmailSelected = () => {
-    const selectedItems = receipts.filter(r => selectedReceiptIds.has(r.id));
-    if (selectedItems.length === 0) return;
-    handleEmailReceipts(selectedItems);
+    // Receipts explicitly selected
+    const explicitlySelectedReceipts = receipts.filter(r => selectedReceiptIds.has(r.id));
+    
+    // Receipts inside selected folders
+    const receiptsInFolders = receipts.filter(r => selectedFolderCategories.has(r.category));
+
+    // Combine and deduplicate by ID
+    const allSelectedMap = new Map();
+    [...explicitlySelectedReceipts, ...receiptsInFolders].forEach(r => {
+        allSelectedMap.set(r.id, r);
+    });
+    
+    const finalSelection: Receipt[] = Array.from(allSelectedMap.values());
+
+    if (finalSelection.length === 0) return;
+    
+    handleEmailReceipts(finalSelection);
     
     // Exit selection mode after sending
     setIsSelectionMode(false);
     setSelectedReceiptIds(new Set());
+    setSelectedFolderCategories(new Set());
+  };
+
+  const handleDeleteSelected = () => {
+    // Receipts explicitly selected
+    const explicitlySelectedReceipts = receipts.filter(r => selectedReceiptIds.has(r.id));
+    
+    // Receipts inside selected folders
+    const receiptsInFolders = receipts.filter(r => selectedFolderCategories.has(r.category));
+
+    // Combine and deduplicate by ID
+    const allSelectedMap = new Map();
+    [...explicitlySelectedReceipts, ...receiptsInFolders].forEach(r => {
+        allSelectedMap.set(r.id, r);
+    });
+    
+    const itemsToDelete = Array.from(allSelectedMap.values());
+    const count = itemsToDelete.length;
+
+    if (count === 0) return;
+
+    if (window.confirm(`האם אתה בטוח שברצונך למחוק ${count} פריטים? פעולה זו אינה הפיכה.`)) {
+         const idsToDelete = new Set(itemsToDelete.map(r => r.id));
+         setReceipts(prev => prev.filter(r => !idsToDelete.has(r.id)));
+         
+         setIsSelectionMode(false);
+         setSelectedReceiptIds(new Set());
+         setSelectedFolderCategories(new Set());
+    }
   };
 
   const toggleSelection = (id: string) => {
@@ -304,13 +364,85 @@ ${itemsList}
     setSelectedReceiptIds(newSelection);
   };
 
+  const toggleCategorySelection = (category: string) => {
+    const newSet = new Set(selectedFolderCategories);
+    if (newSet.has(category)) {
+      newSet.delete(category);
+    } else {
+      newSet.add(category);
+    }
+    setSelectedFolderCategories(newSet);
+  };
+
   const toggleSelectionMode = () => {
       if (isSelectionMode) {
           setIsSelectionMode(false);
           setSelectedReceiptIds(new Set());
+          setSelectedFolderCategories(new Set());
       } else {
           setIsSelectionMode(true);
       }
+  };
+
+  const handleSelectAll = () => {
+    // Determine context
+    let receiptsToSelect: string[] = [];
+    let foldersToSelect: string[] = [];
+
+    // Are we already fully selected?
+    // Simplified logic: If we have > 0 selected, assume we want to clear. 
+    // Wait, better logic: If ALL currently visible items are selected, then clear. Otherwise select all.
+    
+    let allVisibleReceipts: Receipt[] = [];
+    let allVisibleCategories: string[] = [];
+
+    if (selectedCategory) {
+        allVisibleReceipts = displayReceipts;
+    } else if (viewMode === 'credits') {
+        allVisibleReceipts = displayReceipts;
+    } else if (activeTab === 'folders') {
+        // Dashboard
+        allVisibleReceipts = recentReceipts;
+        allVisibleCategories = categories; 
+        // Note: Logic for visible categories is complex in FolderGrid (hiding empty defaults), 
+        // but selecting all categories is safe enough.
+    }
+
+    const allReceiptsSelected = allVisibleReceipts.length > 0 && allVisibleReceipts.every(r => selectedReceiptIds.has(r.id));
+    const allFoldersSelected = allVisibleCategories.length > 0 && allVisibleCategories.every(c => selectedFolderCategories.has(c));
+    
+    // If everything visible is selected (or there is nothing to select), then Deselect All
+    const isEverythingSelected = (allVisibleReceipts.length === 0 || allReceiptsSelected) && 
+                                 (allVisibleCategories.length === 0 || allFoldersSelected);
+
+    if (isEverythingSelected && (allVisibleReceipts.length > 0 || allVisibleCategories.length > 0)) {
+        setSelectedReceiptIds(new Set());
+        setSelectedFolderCategories(new Set());
+    } else {
+        // Select All
+        const newReceiptIds = new Set(selectedReceiptIds);
+        allVisibleReceipts.forEach(r => newReceiptIds.add(r.id));
+        
+        const newCategoryIds = new Set(selectedFolderCategories);
+        allVisibleCategories.forEach(c => newCategoryIds.add(c));
+
+        setSelectedReceiptIds(newReceiptIds);
+        setSelectedFolderCategories(newCategoryIds);
+    }
+  };
+
+  const handleLongPressReceipt = (id: string) => {
+    if (!isSelectionMode) {
+      setIsSelectionMode(true);
+      setSelectedReceiptIds(new Set([id]));
+    }
+  };
+
+  const handleLongPressFolder = (category: string) => {
+    if (!isSelectionMode) {
+      setIsSelectionMode(true);
+      setSelectedFolderCategories(new Set([category]));
+    }
   };
 
   const simulateInboxScan = async () => {
@@ -440,6 +572,8 @@ ${itemsList}
       const { colorClass } = getCategoryStyles(r.category);
       return r.type === 'credit' ? { bg: 'bg-amber-100', text: 'text-amber-600' } : { bg: 'bg-gray-100', text: colorClass };
   };
+
+  const totalSelectionCount = selectedReceiptIds.size + selectedFolderCategories.size;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20 relative">
@@ -685,6 +819,19 @@ ${itemsList}
                         <Mail className="w-4 h-4" />
                         <span>שלח למייל {defaultEmail ? `(${defaultEmail})` : ''}</span>
                     </button>
+
+                    <button
+                        onClick={() => {
+                            if (window.confirm('האם למחוק מסמך זה?')) {
+                                setReceipts(prev => prev.filter(r => r.id !== selectedReceipt.id));
+                                setSelectedReceipt(null);
+                            }
+                        }}
+                        className="flex items-center justify-center gap-2 w-full bg-red-50 text-red-600 py-3 rounded-xl font-medium border border-red-100 hover:bg-red-100 transition-colors"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                        <span>מחק מסמך</span>
+                    </button>
                 </div>
 
                  {selectedReceipt.imageUrl && (
@@ -698,14 +845,22 @@ ${itemsList}
       )}
 
       {/* --- Main Header --- */}
-      <header className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-gray-200 px-4 py-3 pb-2 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
+      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-gray-200 px-4 py-3 shadow-sm transition-all">
+        <div className="flex items-center justify-between gap-3 mb-2">
           {isSelectionMode ? (
-             <div className="flex items-center gap-3 w-full">
-               <button onClick={toggleSelectionMode} className="p-1">
-                 <X className="w-6 h-6 text-gray-600" />
-               </button>
-               <span className="font-bold text-lg">{selectedReceiptIds.size} נבחרו</span>
+             <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-3">
+                    <button onClick={toggleSelectionMode} className="p-1">
+                        <X className="w-6 h-6 text-gray-600" />
+                    </button>
+                    <span className="font-bold text-lg">{totalSelectionCount} נבחרו</span>
+                </div>
+                <button 
+                    onClick={handleSelectAll}
+                    className="text-blue-600 font-bold text-sm px-3 py-1 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                >
+                    בחר הכל
+                </button>
              </div>
           ) : selectedCategory ? (
              <button onClick={() => setSelectedCategory(null)} className="flex items-center text-gray-600 gap-1">
@@ -718,8 +873,8 @@ ${itemsList}
           
           {!isSelectionMode && (
              <div className="flex gap-2">
-                 {/* Only show select button in list views (category selected or recent list) */}
-                {(selectedCategory || (activeTab === 'folders' && !selectedCategory && recentReceipts.length > 0)) && (
+                 {/* Show selection button in all folder/list views if scanning is done */}
+                {(activeTab === 'folders') && (
                      <button 
                         onClick={toggleSelectionMode}
                         className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center active:scale-95 transition-transform"
@@ -737,29 +892,7 @@ ${itemsList}
           )}
         </div>
 
-        {/* View Toggle (Receipts vs Credits) - Hide in Selection Mode */}
-        {!selectedCategory && !isSelectionMode && (
-            <div className="flex p-1 bg-gray-100 rounded-xl mb-3 relative">
-                <button 
-                    onClick={() => setViewMode('expenses')}
-                    className={`flex-1 py-1.5 text-sm font-bold rounded-lg transition-all ${viewMode === 'expenses' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
-                >
-                    הוצאות
-                </button>
-                <button 
-                    onClick={() => setViewMode('credits')}
-                    className={`flex-1 py-1.5 text-sm font-bold rounded-lg transition-all relative ${viewMode === 'credits' ? 'bg-white shadow-sm text-amber-600' : 'text-gray-500'}`}
-                >
-                    זיכויים
-                    {/* Badge on Toggle */}
-                    {expiringCredits.length > 0 && (
-                        <span className="absolute -top-1 -left-1 w-3 h-3 bg-red-500 rounded-full border border-white"></span>
-                    )}
-                </button>
-            </div>
-        )}
-
-        {/* Search Bar - Hide in Selection Mode */}
+        {/* Search Bar - Always visible except selection mode */}
         {!isSelectionMode && (
             <div className="relative">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -775,7 +908,7 @@ ${itemsList}
       </header>
 
       {/* --- Content Area --- */}
-      <main className={`p-4 space-y-6 ${isSelectionMode ? 'pb-24' : ''}`}>
+      <main className={`p-4 space-y-4 ${isSelectionMode ? 'pb-24' : ''}`}>
         
         {isScanning && (
           <div className="bg-blue-600 text-white px-4 py-3 rounded-xl flex items-center gap-3 shadow-lg shadow-blue-200 animate-pulse">
@@ -811,35 +944,83 @@ ${itemsList}
             </div>
         )}
 
-        {/* MONTHLY SUMMARY - Visible on Dashboard Main Screen (Both Expenses & Credits) */}
-        {!selectedCategory && activeTab === 'folders' && !isSelectionMode && (
-             <div className="grid grid-cols-2 gap-3 mb-2">
-                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden">
-                     <div className="absolute top-0 right-0 w-16 h-16 bg-red-50 rounded-bl-full -mr-8 -mt-8"></div>
-                     <span className="text-xs font-bold text-gray-400 block mb-1 relative z-10">הוצאות {currentMonthName}</span>
-                     <div className="flex items-center gap-2 mt-2">
-                         <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center text-red-500">
-                            <TrendingDown className="w-4 h-4" />
-                         </div>
-                         <span className="text-2xl font-black text-gray-900">₪{monthlyStats.expenses.toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-                     </div>
-                 </div>
-                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden">
-                     <div className="absolute top-0 right-0 w-16 h-16 bg-amber-50 rounded-bl-full -mr-8 -mt-8"></div>
-                     <span className="text-xs font-bold text-amber-500/80 block mb-1 relative z-10">זיכויים {currentMonthName}</span>
-                     <div className="flex items-center gap-2 mt-2">
-                          <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center text-amber-500">
-                            <TrendingUp className="w-4 h-4" />
-                         </div>
-                          <span className="text-2xl font-black text-amber-600">₪{monthlyStats.credits.toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-                     </div>
-                 </div>
+        {/* SUMMARY CARD - Combined Yearly/Monthly - Only visible on Home Screen */}
+        {!selectedCategory && !isSelectionMode && activeTab === 'folders' && (
+             <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-24 h-24 bg-blue-50/50 rounded-br-full -ml-8 -mt-8 pointer-events-none"></div>
+                
+                <h2 className="text-gray-400 text-xs font-bold mb-4 flex items-center gap-1 relative z-10">
+                   <Calendar className="w-3 h-3" />
+                   סיכום שנתי ({currentYear})
+                </h2>
+                
+                <div className="flex items-center justify-between px-2 relative z-10">
+                    <div className="text-center">
+                        <span className="text-sm text-gray-500 block mb-1">סה"כ הוצאות</span>
+                        <span className="text-2xl font-black text-gray-900">
+                          ₪{yearlyStats.expenses.toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </span>
+                    </div>
+                    <div className="w-px h-10 bg-gray-100"></div>
+                    <div className="text-center">
+                        <span className="text-sm text-gray-500 block mb-1">סה"כ זיכויים</span>
+                        <span className="text-2xl font-black text-amber-600">
+                          ₪{yearlyStats.credits.toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </span>
+                    </div>
+                </div>
+                
+                {/* Monthly mini-summary */}
+                <div className="mt-6 pt-4 border-t border-gray-50 grid grid-cols-2 gap-4 relative z-10">
+                    <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-red-50 flex items-center justify-center text-red-500">
+                           <TrendingDown className="w-3 h-3" />
+                        </div>
+                        <div className="flex flex-col">
+                           <span className="text-[10px] text-gray-400 font-bold">הוצאות {currentMonthName}</span>
+                           <span className="text-sm font-bold text-gray-700">₪{monthlyStats.expenses.toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-amber-50 flex items-center justify-center text-amber-500">
+                           <TrendingUp className="w-3 h-3" />
+                        </div>
+                        <div className="flex flex-col">
+                           <span className="text-[10px] text-gray-400 font-bold">זיכויים {currentMonthName}</span>
+                           <span className="text-sm font-bold text-amber-600">₪{monthlyStats.credits.toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                        </div>
+                    </div>
+                </div>
              </div>
+        )}
+
+        {/* TABS (Expenses / Credits) - Sticky - Only visible on Home Screen */}
+        {!selectedCategory && !isSelectionMode && activeTab === 'folders' && (
+            <div className="sticky top-[110px] z-10 bg-gray-50/95 backdrop-blur py-2 -mx-4 px-4 shadow-sm transition-all border-b border-gray-200/50">
+                <div className="flex p-1 bg-white border border-gray-200 rounded-xl relative shadow-sm">
+                    <button 
+                        onClick={() => setViewMode('expenses')}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${viewMode === 'expenses' ? 'bg-gray-900 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
+                    >
+                        הוצאות
+                    </button>
+                    <button 
+                        onClick={() => setViewMode('credits')}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all relative ${viewMode === 'credits' ? 'bg-amber-500 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
+                    >
+                        זיכויים
+                        {/* Badge on Toggle */}
+                        {expiringCredits.length > 0 && (
+                            <span className="absolute -top-1 -left-1 w-3 h-3 bg-red-500 rounded-full border border-white"></span>
+                        )}
+                    </button>
+                </div>
+            </div>
         )}
 
         {/* FOLDERS VIEW (Expenses) */}
         {!selectedCategory && viewMode === 'expenses' && activeTab === 'folders' && (
-          <section className="space-y-6">
+          <section className="space-y-6 pt-2">
             
             {/* Recent Receipts Section */}
             {recentReceipts.length > 0 && (
@@ -854,6 +1035,7 @@ ${itemsList}
                             isSelectionMode={isSelectionMode}
                             isSelected={selectedReceiptIds.has(r.id)}
                             onToggleSelection={toggleSelection}
+                            onLongPress={handleLongPressReceipt}
                         />
                     ))}
                 </div>
@@ -861,28 +1043,30 @@ ${itemsList}
             )}
 
             {/* Folders Section - Hide folders when in global selection mode if we want to focus on recent items, or just disable folder interaction */}
-            {!isSelectionMode && (
-                <div>
-                <h2 className="text-lg font-bold text-gray-800 mb-3 px-1">תיקיות</h2>
-                <FolderGrid 
-                    receipts={receipts.filter(r => r.type !== 'credit')} 
-                    categories={categories}
-                    onSelectCategory={setSelectedCategory} 
-                    onAddFolder={() => setShowNewFolderModal(true)}
-                    onRenameFolder={initiateRename}
-                    onEmailFolder={handleEmailFolder}
-                />
-                </div>
-            )}
+            <div>
+            <h2 className="text-lg font-bold text-gray-800 mb-3 px-1">תיקיות</h2>
+            <FolderGrid 
+                receipts={receipts.filter(r => r.type !== 'credit')} 
+                categories={categories}
+                onSelectCategory={setSelectedCategory} 
+                onAddFolder={() => setShowNewFolderModal(true)}
+                onRenameFolder={initiateRename}
+                onEmailFolder={handleEmailFolder}
+                isSelectionMode={isSelectionMode}
+                selectedCategories={selectedFolderCategories}
+                onToggleCategory={toggleCategorySelection}
+                onLongPress={handleLongPressFolder}
+            />
+            </div>
           </section>
         )}
 
         {/* LIST VIEW (Credits or specific Category) */}
         {(selectedCategory || viewMode === 'credits') && (
-            <section>
+            <section className={(!selectedCategory && viewMode === 'credits') ? 'pt-2' : ''}>
             <div className="flex justify-between items-center mb-4 px-1">
                 <h2 className="text-lg font-bold text-gray-800">
-                {viewMode === 'credits' ? 'זיכויים זמינים' : selectedCategory}
+                {viewMode === 'credits' && !selectedCategory ? 'זיכויים זמינים' : selectedCategory}
                 </h2>
                 
                 {/* Sort Dropdown - Hide in Selection */}
@@ -913,6 +1097,7 @@ ${itemsList}
                         isSelectionMode={isSelectionMode}
                         isSelected={selectedReceiptIds.has(r.id)}
                         onToggleSelection={toggleSelection}
+                        onLongPress={handleLongPressReceipt}
                     />
                     ))
                 ) : (
@@ -952,16 +1137,27 @@ ${itemsList}
       {isSelectionMode && (
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between z-30 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
               <span className="text-sm font-medium text-gray-500">
-                  {selectedReceiptIds.size} פריטים נבחרו
+                  {totalSelectionCount} פריטים נבחרו
               </span>
-              <button 
-                onClick={handleEmailSelected}
-                disabled={selectedReceiptIds.size === 0}
-                className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200 disabled:opacity-50 disabled:shadow-none"
-              >
-                  <Mail className="w-5 h-5" />
-                  שלח במייל
-              </button>
+              <div className="flex gap-3">
+                <button 
+                    onClick={handleDeleteSelected}
+                    disabled={totalSelectionCount === 0}
+                    className="bg-red-50 text-red-600 px-4 py-3 rounded-xl font-bold flex items-center gap-2 border border-red-100 disabled:opacity-50 disabled:border-transparent"
+                    title="מחק נבחרים"
+                >
+                    <Trash2 className="w-5 h-5" />
+                </button>
+                <button 
+                    onClick={handleEmailSelected}
+                    disabled={totalSelectionCount === 0}
+                    className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200 disabled:opacity-50 disabled:shadow-none"
+                >
+                    <Mail className="w-5 h-5" />
+                    <span className="hidden sm:inline">שלח במייל</span>
+                    <span className="sm:hidden">שלח</span>
+                </button>
+              </div>
           </div>
       )}
 

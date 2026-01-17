@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Receipt } from '../types';
 import { CATEGORY_COLORS, CATEGORY_ICONS, getCategoryStyles } from '../constants';
 import { ExternalLink, Calendar, Loader2, Tag, Clock, Check } from 'lucide-react';
@@ -9,10 +9,13 @@ interface Props {
   isSelectionMode?: boolean;
   isSelected?: boolean;
   onToggleSelection?: (id: string) => void;
+  onLongPress?: (id: string) => void;
 }
 
-export const ReceiptCard: React.FC<Props> = ({ receipt, onClick, isSelectionMode = false, isSelected = false, onToggleSelection }) => {
+export const ReceiptCard: React.FC<Props> = ({ receipt, onClick, isSelectionMode = false, isSelected = false, onToggleSelection, onLongPress }) => {
   const isCredit = receipt.type === 'credit';
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLongPressRef = useRef(false);
   
   // Dynamic styling based on type and custom categories
   const { icon: CategoryIcon, colorClass: categoryColorClass } = getCategoryStyles(receipt.category);
@@ -34,7 +37,28 @@ export const ReceiptCard: React.FC<Props> = ({ receipt, onClick, isSelectionMode
     }
   };
 
-  const handleClick = () => {
+  const handleTouchStart = () => {
+    if (isSelectionMode) return;
+    isLongPressRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+        isLongPressRef.current = true;
+        if (onLongPress) onLongPress(receipt.id);
+    }, 600);
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+    }
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (isLongPressRef.current) {
+        e.preventDefault();
+        return;
+    }
+
     if (isSelectionMode && onToggleSelection) {
       onToggleSelection(receipt.id);
     } else {
@@ -59,7 +83,13 @@ export const ReceiptCard: React.FC<Props> = ({ receipt, onClick, isSelectionMode
   return (
     <div 
       onClick={handleClick}
-      className={`bg-white p-4 rounded-xl shadow-sm border ${borderClass} flex items-center gap-4 active:scale-[0.98] transition-all cursor-pointer relative overflow-hidden`}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchMove={handleTouchEnd}
+      onMouseDown={handleTouchStart}
+      onMouseUp={handleTouchEnd}
+      onMouseLeave={handleTouchEnd}
+      className={`bg-white p-4 rounded-xl shadow-sm border ${borderClass} flex items-center gap-4 active:scale-[0.98] transition-all cursor-pointer relative overflow-hidden select-none`}
     >
       {/* Visual Indicator strip for Credits */}
       {isCredit && !isSelected && <div className="absolute top-0 right-0 w-1.5 h-full bg-amber-400"></div>}
