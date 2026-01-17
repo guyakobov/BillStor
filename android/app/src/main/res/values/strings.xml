@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BillStor</string>
+    <string name="title_activity_main">BillStor</string>
+    <string name="package_name">com.billstor.app</string>
+    <string name="custom_url_scheme">com.billstor.app</string>
+</resources>
