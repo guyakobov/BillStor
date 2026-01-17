@@ -1,14 +1,21 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Receipt, Category } from "../types";
 
-// Initialize Gemini
-// Note: In a production web app, it's safer to proxy this through a backend.
-// For this demo, we use the key directly as requested.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Initialize Gemini lazily
+let aiInstance: GoogleGenAI | null = null;
+const getAI = () => {
+  if (!aiInstance) {
+    // Vite will replace process.env.API_KEY during build
+    const apiKey = process.env.API_KEY || "";
+    aiInstance = new GoogleGenAI(apiKey);
+  }
+  return aiInstance;
+};
 
 export const analyzeReceiptFromText = async (smsBody: string): Promise<Partial<Receipt>> => {
   try {
-    const model = 'gemini-3-flash-preview';
+    const ai = getAI();
+    const model = 'gemini-1.5-flash-latest';
 
     // We define a schema to ensure structured JSON output
     const responseSchema = {
@@ -18,15 +25,15 @@ export const analyzeReceiptFromText = async (smsBody: string): Promise<Partial<R
         date: { type: Type.STRING, description: "The date of the transaction in ISO YYYY-MM-DD format. If today, use current date." },
         amount: { type: Type.NUMBER, description: "The total amount paid or credited" },
         currency: { type: Type.STRING, description: "The currency symbol (₪, $, €)" },
-        category: { 
-          type: Type.STRING, 
+        category: {
+          type: Type.STRING,
           enum: Object.values(Category),
-          description: "The category of the expense" 
+          description: "The category of the expense"
         },
-        type: { 
-          type: Type.STRING, 
-          enum: ["receipt", "credit"], 
-          description: "The type of document. 'credit' if the text mentions 'זיכוי', 'refund', 'voucher' or 'credit note'. 'receipt' otherwise." 
+        type: {
+          type: Type.STRING,
+          enum: ["receipt", "credit"],
+          description: "The type of document. 'credit' if the text mentions 'זיכוי', 'refund', 'voucher' or 'credit note'. 'receipt' otherwise."
         },
         expirationDate: { type: Type.STRING, description: "If type is 'credit', extract the expiration date (valid until) in ISO format." }
       },
@@ -71,7 +78,7 @@ export const analyzeReceiptFromText = async (smsBody: string): Promise<Partial<R
         expirationDate: data.expirationDate,
       };
     }
-    
+
     throw new Error("Empty response from AI");
 
   } catch (error) {
@@ -90,7 +97,8 @@ export const analyzeReceiptFromText = async (smsBody: string): Promise<Partial<R
 
 export const analyzeReceiptFromImage = async (base64Image: string): Promise<Partial<Receipt>> => {
   try {
-    const model = 'gemini-2.5-flash-image';
+    const ai = getAI();
+    const model = 'gemini-1.5-flash-latest';
 
     const prompt = `
       Analyze this image. It is either a Receipt or a Credit Note (Store Credit/Voucher).
@@ -106,7 +114,6 @@ export const analyzeReceiptFromImage = async (base64Image: string): Promise<Part
       Return JSON object.
     `;
 
-    // Note: 2.5-flash-image doesn't support responseSchema perfectly yet, so we prompt for JSON text.
     const response = await ai.models.generateContent({
       model: model,
       contents: {
@@ -121,8 +128,8 @@ export const analyzeReceiptFromImage = async (base64Image: string): Promise<Part
     });
 
     if (response.text) {
-       const data = JSON.parse(response.text);
-       return {
+      const data = JSON.parse(response.text);
+      return {
         merchant: data.merchant || data.Merchant,
         date: data.date || data.Date || new Date().toISOString(),
         amount: data.amount || data.totalAmount || 0,
