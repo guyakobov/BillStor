@@ -1,7 +1,7 @@
 import { Category } from './types';
 import { ShoppingBag, Utensils, Car, Home, HeartPulse, FileText, Folder } from 'lucide-react';
 
-export const KEYWORDS = ["קבלה", "חשבונית", "invoice", "receipt", "זיכוי"];
+export const KEYWORDS = ["קבלה", "חשבונית", "invoice", "receipt", "זיכוי", "לצפייה"];
 
 export const DEFAULT_CATEGORIES = Object.values(Category);
 

@@ -6,6 +6,7 @@ import { analyzeReceiptFromText, analyzeReceiptFromImage } from './services/gemi
 import { requestSmsPermissions, readReceiptSms } from './services/smsService';
 import { FolderGrid } from './components/FolderGrid';
 import { ReceiptCard } from './components/ReceiptCard';
+import { SMSDebugger } from './components/SMSDebugger';
 
 const simpleId = () => Math.random().toString(36).substring(2, 11);
 
@@ -44,7 +45,23 @@ export default function App() {
     } catch (e) {
       console.error("Local Storage Load Error:", e);
     }
+
+    // Auto-check permissions on startup with a delay
+    setTimeout(() => {
+      checkAndRequestPermissions();
+    }, 1200);
   }, []);
+
+  const checkAndRequestPermissions = async () => {
+    // Try to trigger the system dialog automatically on mount
+    const permissionResult = await requestSmsPermissions();
+    if (permissionResult.granted) {
+      setPermissionGranted(true);
+      setShowPermissionModal(false);
+    } else {
+      console.log("Auto-permission check: Not granted yet.");
+    }
+  };
 
   // Save to local storage
   useEffect(() => {
@@ -56,17 +73,26 @@ export default function App() {
   }, [categories]);
 
   const handlePermission = async () => {
-    // Request SMS permissions
+    // 1. Try to request permissions (triggers system dialog if needed)
     const permissionResult = await requestSmsPermissions();
 
-    if (permissionResult.granted) {
+    // 2. Attempt a trial scan to see if we actually have access
+    // This handles cases where permissionResult.granted might be a false negative
+    setScanningStatus('בודק גישה להודעות...');
+    const trialScan = await readReceiptSms();
+
+    if (trialScan.error && trialScan.error.includes('permissions not granted')) {
+      console.log("Permission truly not granted:", trialScan.error);
+      alert('יש לאשר הרשאות SMS בהגדרות המכשיר.\n\nבמכשירי Xiaomi/Poco:\n1. גש להגדרות > אפליקציות > BillStor\n2. הרשאות > SMS > אפשר\n3. (חשוב!) הרשאות אחרות > שירות הודעות SMS > אפשר');
+    } else {
+      // If we got messages or just a generic "no messages" (trialScan.error is null), it means we have access!
+      console.log("Access verified via trial scan.");
       setPermissionGranted(true);
       setShowPermissionModal(false);
+
+      // If messages were found in the trial, we don't need to full scan again, 
+      // but scanInboxForReceipts handles state updates better, so we call it.
       scanInboxForReceipts();
-    } else {
-      // Permission denied - show error or fallback
-      alert('SMS permissions are required to scan for receipts. Please enable them in settings.');
-      setShowPermissionModal(false);
     }
   };
 
@@ -294,7 +320,15 @@ export default function App() {
           ) : (
             <h1 className="text-2xl font-black text-gray-900 tracking-tight">הארנק שלי</h1>
           )}
-          <Settings className="w-6 h-6 text-gray-400" />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePermission}
+              className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded-lg font-bold border border-red-100"
+            >
+              תיקון הרשאות
+            </button>
+            <Settings className="w-6 h-6 text-gray-400" />
+          </div>
         </div>
 
         {!selectedCategory && (
@@ -361,6 +395,9 @@ export default function App() {
           <span className="text-[10px] font-medium">סריקת SMS</span>
         </button>
       </nav>
-    </div>
+
+      {/* --- On-screen SMS Debugger --- */}
+      <SMSDebugger />
+    </div >
   );
 }
