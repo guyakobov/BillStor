@@ -7,6 +7,7 @@ import { requestSmsPermissions, readReceiptSms } from './services/smsService';
 import { FolderGrid } from './components/FolderGrid';
 import { ReceiptCard } from './components/ReceiptCard';
 import { SMSDebugger } from './components/SMSDebugger';
+import { ReceiptsList } from './components/ReceiptsList';
 
 const simpleId = () => Math.random().toString(36).substring(2, 11);
 
@@ -58,6 +59,8 @@ export default function App() {
     if (permissionResult.granted) {
       setPermissionGranted(true);
       setShowPermissionModal(false);
+      // Automatically scan in background if permission already granted
+      scanInboxForReceipts();
     } else {
       console.log("Auto-permission check: Not granted yet.");
     }
@@ -134,7 +137,7 @@ export default function App() {
     const newMessages = foundMessages.filter(msg => !receipts.some(r => r.originalSmsBody === msg.body));
 
     if (newMessages.length === 0) {
-      setScanningStatus('לא נמצאו הודעות חדשות');
+      setScanningStatus('לא נמצאו הודעות חדשות לעיבוד');
       setTimeout(() => setIsScanning(false), 2000);
       return;
     }
@@ -370,11 +373,15 @@ export default function App() {
           />
         )}
 
-        {(selectedCategory || viewMode === 'credits') && (
-          <div className="space-y-3">
-            {displayReceipts.map(r => <ReceiptCard key={r.id} receipt={r} onClick={setSelectedReceipt} />)}
-            {displayReceipts.length === 0 && <p className="text-center text-gray-400 py-10 text-sm">אין פריטים להצגה</p>}
-          </div>
+        {activeTab === 'scan' ? (
+          <ReceiptsList onProcessAll={scanInboxForReceipts} />
+        ) : (
+          (selectedCategory || viewMode === 'credits' || activeTab === 'folders') && (
+            <div className="space-y-3">
+              {displayReceipts.map(r => <ReceiptCard key={r.id} receipt={r} onClick={setSelectedReceipt} />)}
+              {displayReceipts.length === 0 && <p className="text-center text-gray-400 py-10 text-sm">אין פריטים להצגה</p>}
+            </div>
+          )
         )}
       </main>
 
@@ -388,7 +395,7 @@ export default function App() {
           <Folder className="w-6 h-6" /><span className="text-[10px] font-medium">ראשי</span>
         </button>
         <button
-          onClick={scanInboxForReceipts}
+          onClick={() => setActiveTab('scan')}
           className={`flex flex-col items-center gap-1 ${activeTab === 'scan' ? 'text-blue-600' : 'text-gray-400'}`}
         >
           <MessageSquare className={`w-6 h-6 ${activeTab === 'scan' ? 'fill-current' : ''}`} />
