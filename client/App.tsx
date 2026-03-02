@@ -6,7 +6,6 @@ import { analyzeReceiptFromText, analyzeReceiptFromImage } from './services/loca
 import { requestSmsPermissions, readReceiptSms } from './services/smsService';
 import { FolderGrid } from './components/FolderGrid';
 import { ReceiptCard } from './components/ReceiptCard';
-import { SMSDebugger } from './components/SMSDebugger';
 import { ReceiptsList } from './components/ReceiptsList';
 
 const simpleId = () => Math.random().toString(36).substring(2, 11);
@@ -414,8 +413,6 @@ export default function App() {
         </button>
       </nav>
 
-      {/* --- On-screen SMS Debugger --- */}
-      <SMSDebugger />
     </div >
   );
 }
