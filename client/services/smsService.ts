@@ -2,13 +2,13 @@ import { registerPlugin } from '@capacitor/core';
 import { KEYWORDS } from '../constants';
 import { SMSMessage } from '../types';
 
-interface SmsPlugin {
+export interface SmsPlugin {
     readSMS(): Promise<{ messages: any[] }>;
     checkPermissions(): Promise<{ sms: string }>;
     requestPermissions(): Promise<{ sms: string }>;
 }
 
-const SmsPlugin = registerPlugin<SmsPlugin>('SmsPlugin');
+export const SmsPlugin = registerPlugin<SmsPlugin>('SmsPlugin');
 
 export interface SmsPermissionResult {
     granted: boolean;

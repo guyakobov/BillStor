@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, Folder, MessageSquare, Plus, ArrowRight, Settings, Camera, ShieldCheck, X, Loader2, FileText, Tag, ChevronDown, Check, Mail, Pencil } from 'lucide-react';
 import { Receipt, Category, SMSMessage } from './types';
 import { KEYWORDS, MOCK_SMS_MESSAGES, getCategoryStyles, DEFAULT_CATEGORIES } from './constants';
-import { analyzeReceiptFromText, analyzeReceiptFromImage } from './services/geminiService';
+import { analyzeReceiptFromText, analyzeReceiptFromImage } from './services/localParser';
 import { requestSmsPermissions, readReceiptSms } from './services/smsService';
 import { FolderGrid } from './components/FolderGrid';
 import { ReceiptCard } from './components/ReceiptCard';
