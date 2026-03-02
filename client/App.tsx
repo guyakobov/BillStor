@@ -30,6 +30,7 @@ export default function App() {
   const [newFolderName, setNewFolderName] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const receiptsRef = useRef<Receipt[]>([]);
 
   // Load from local storage
   useEffect(() => {
@@ -60,7 +61,7 @@ export default function App() {
       setPermissionGranted(true);
       setShowPermissionModal(false);
       // Automatically scan in background if permission already granted
-      scanInboxForReceipts();
+      scanInboxForReceipts(true);
     } else {
       console.log("Auto-permission check: Not granted yet.");
     }
@@ -68,6 +69,7 @@ export default function App() {
 
   // Save to local storage
   useEffect(() => {
+    receiptsRef.current = receipts;
     localStorage.setItem('receipts_data', JSON.stringify(receipts));
   }, [receipts]);
 
@@ -118,31 +120,40 @@ export default function App() {
     }
   };
 
-  const scanInboxForReceipts = async () => {
+  const scanInboxForReceipts = async (silent = false) => {
     if (isScanning) return;
     setIsScanning(true);
-    setActiveTab('scan');
-    setScanningStatus('סורק הודעות SMS...');
+
+    if (!silent) {
+      setActiveTab('scan');
+      setScanningStatus('סורק הודעות SMS...');
+    } else {
+      setScanningStatus('סורק הודעות ברקע...');
+    }
 
     // Read real SMS messages from device
     const smsResult = await readReceiptSms();
 
     if (smsResult.error) {
-      setScanningStatus(`שגיאה: ${smsResult.error}`);
+      if (!silent) setScanningStatus(`שגיאה: ${smsResult.error}`);
       setTimeout(() => setIsScanning(false), 3000);
       return;
     }
 
     const foundMessages = smsResult.messages;
-    const newMessages = foundMessages.filter(msg => !receipts.some(r => r.originalSmsBody === msg.body));
+    const newMessages = foundMessages.filter(msg => !receiptsRef.current.some(r => r.originalSmsBody === msg.body));
 
     if (newMessages.length === 0) {
-      setScanningStatus('לא נמצאו הודעות חדשות לעיבוד');
-      setTimeout(() => setIsScanning(false), 2000);
+      if (!silent) setScanningStatus('לא נמצאו הודעות חדשות לעיבוד');
+      setTimeout(() => setIsScanning(false), silent ? 0 : 2000);
       return;
     }
 
-    setScanningStatus(`נמצאו ${newMessages.length} מסמכים. מפענח...`);
+    if (!silent) {
+      setScanningStatus(`נמצאו ${newMessages.length} מסמכים. מפענח...`);
+    } else {
+      setScanningStatus(`מפענח ${newMessages.length} הודעות ברקע...`);
+    }
 
     for (const msg of newMessages) {
       const tempId = simpleId();
@@ -175,8 +186,8 @@ export default function App() {
       }
     }
 
-    setScanningStatus('הסריקה הושלמה בהצלחה');
-    setTimeout(() => setIsScanning(false), 2000);
+    if (!silent) setScanningStatus('הסריקה הושלמה בהצלחה');
+    setTimeout(() => setIsScanning(false), silent ? 0 : 2000);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -374,7 +385,7 @@ export default function App() {
         )}
 
         {activeTab === 'scan' ? (
-          <ReceiptsList onProcessAll={scanInboxForReceipts} />
+          <ReceiptsList onProcessAll={() => scanInboxForReceipts(false)} />
         ) : (
           (selectedCategory || viewMode === 'credits' || activeTab === 'folders') && (
             <div className="space-y-3">
